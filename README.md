@@ -2,6 +2,8 @@
 
 An AI-powered tool for deep document understanding, Q&A, and logic-based challenge generation from user-uploaded research papers, reports, and technical documents.
 
+![Screenshot 2025-07-07 145914](https://github.com/user-attachments/assets/d88e5bd8-0d29-499e-90a2-7bae2dee9950)
+
 ## Features
 - Upload PDF/TXT documents
 - Auto-summary (≤150 words)
