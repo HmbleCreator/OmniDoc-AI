@@ -151,6 +151,3 @@ pytest  # or python test_backend.py
 ```
 
 ---
-
-## Architecture & Reasoning Flow
-See the top of this file for a summary. For more details, see the code comments and docstrings.
