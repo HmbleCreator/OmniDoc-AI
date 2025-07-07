@@ -1,0 +1,30 @@
+# Core LLM and AI dependencies
+openai>=1.0.0
+anthropic>=0.21.3
+llama-cpp-python>=0.2.72
+sentence-transformers>=2.2.2
+langchain>=0.1.14
+chromadb>=0.4.24
+pdfplumber>=0.10.3
+PyMuPDF>=1.23.22
+spacy>=3.7.2
+nltk>=3.8.1
+keybert>=0.8.3
+yake>=0.4.8
+scikit-learn>=1.4.2
+
+# Google Gemini
+google-generativeai>=0.3.2
+
+# FastAPI and server
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# Utilities
+pydantic>=2.6.4
+python-dotenv>=1.0.1
+requests>=2.31.0
+
+# For testing
+pytest>=8.1.1 

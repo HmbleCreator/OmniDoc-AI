@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>OmniDoc AI - Smart Document Assistant Frontend</title>
+    <!-- Preload critical resources for Edge -->
+    <link rel="preload" href="/src/main.tsx" as="script" type="module" />
+  </head>
+  <body>
+    <div id="root">
+      <!-- Fallback content for Edge -->
+      <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #121212; color: #ECEFF1; font-family: Arial, sans-serif;">
+        <div style="text-align: center;">
+          <h2>Loading OmniDoc AI...</h2>
+          <p>Please wait while the application loads.</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
