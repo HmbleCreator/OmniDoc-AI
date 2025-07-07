@@ -1,38 +1,44 @@
 # 🚀 OmniDoc AI - Quick Start Guide
 
-Get OmniDoc AI running in 5 minutes!
-
-## ⚡ Super Quick Setup
-
-### Option 1: Automated Setup (Recommended)
+## 1. Backend Setup
 ```bash
-# Clone and setup everything automatically
-git clone <repository-url>
-cd project
-python setup.py
-```
-
-### Option 2: Manual Setup
-```bash
-# 1. Install backend dependencies
 cd backend
 pip install -r requirements.txt
-
-# 2. Download AI models (this takes a few minutes)
 python download_models.py
-
-# 3. Install frontend dependencies
-cd ../frontend
-npm install
-
-# 4. Start the backend (Fast startup with logs)
-cd ../backend
-python start_backend.py
-
-# 5. Start the frontend (in a new terminal)
-cd ../frontend
-npm run dev
+python main.py  # Starts backend at http://localhost:8000
 ```
+
+## 2. Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev  # Starts frontend at http://localhost:5173
+```
+
+## 3. Usage
+- Upload PDF/TXT documents
+- View auto-summary
+- Use "Ask Anything" for Q&A
+- Use "Challenge Me" for logic-based questions
+- All answers include references to the document
+
+## 4. API Keys
+- Add your LLM API keys in the sidebar (frontend) or in `backend/.env`
+
+## 5. Running Tests
+```bash
+cd tests
+pytest  # or python test_backend.py
+```
+
+## 6. Troubleshooting
+| Issue                  | Solution                                      |
+|------------------------|-----------------------------------------------|
+| Backend won't start    | Run `python download_models.py` in backend    |
+| Frontend can't connect | Make sure backend is running on port 8000     |
+| Model download slow    | Wait for first run; models are cached         |
+| Port already in use    | Change port in `main.py` or frontend config   |
+| ChromaDB errors        | Delete `chroma_db/` and restart backend       |
 
 ## 🎯 What You'll Get
 
@@ -54,15 +60,6 @@ You can use OmniDoc AI without API keys for basic functionality, or add them for
 - **OpenAI**: https://platform.openai.com/
 - **Google Gemini**: https://makersuite.google.com/
 - **Anthropic Claude**: https://console.anthropic.com/
-
-## 🐛 Common Issues
-
-| Issue | Solution |
-|-------|----------|
-| Backend won't start | Run `python download_models.py` in backend directory |
-| Frontend can't connect | Make sure backend is running on port 8000 |
-| Models downloading slowly | This is normal on first run - they're cached after download |
-| Port already in use | Change port: `uvicorn main:app --port 8001` |
 
 ## 📚 Next Steps
 
