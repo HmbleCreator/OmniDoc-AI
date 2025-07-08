@@ -24,6 +24,11 @@ pip install -r requirements.txt
 python download_models.py  # Download required AI models
 python main.py             # Start backend server (http://localhost:8000)
 ```
+After running the backend you should see a confirmation message like this:
+![image](https://github.com/user-attachments/assets/1ec3ebff-de78-4abb-abe5-db7f3c97cd89)
+
+after seeing the confirmation message only you can make calls to backend otherwise it will be error.
+
 
 ### 2. Frontend (React)
 ```bash
