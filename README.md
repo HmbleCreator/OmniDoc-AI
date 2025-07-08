@@ -36,6 +36,7 @@ cd frontend
 npm install
 npm run dev                # Start frontend (http://localhost:5173)
 ```
+## Demo Video
 ---
 [![Watch the demo](https://img.youtube.com/vi/xm80FWNeFKY/maxresdefault.jpg)](https://www.youtube.com/watch?v=xm80FWNeFKY)
 ---
