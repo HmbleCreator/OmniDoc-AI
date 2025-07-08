@@ -1,8 +1,10 @@
+import json
 from fastapi import APIRouter, HTTPException, Body, Query, Request
 from typing import List, Dict, Any, Optional
 import uuid
 from datetime import datetime
 import dataclasses
+import traceback
 
 from api.models import (
     ChatRequest, ChatResponse, ChatMessage, 
@@ -32,10 +34,6 @@ def extract_api_keys(request: Request) -> Dict[str, str]:
 
 @router.post("/ask", response_model=ChatResponse)
 async def ask_question(request: ChatRequest, http_request: Request):
-    from backend.api.models import ChatMessage, ChatResponse, DocumentReference
-    from datetime import datetime
-    import uuid
-    import traceback, json
     try:
         # Extract API keys from headers
         api_keys = extract_api_keys(http_request)
@@ -151,33 +149,31 @@ async def ask_question(request: ChatRequest, http_request: Request):
         )
         reasoning_steps.append(evaluation_step)
 
-        # Create enhanced document references with citations (deduplicated)
+        # Debug: Print top 3 search_results before building enhanced_references
+        print("[DEBUG] Top 3 search_results:", [
+            {
+                'citation': r.get('citation'),
+                'relevance_score': r.get('relevance_score'),
+                'chunk_preview': r.get('chunk', '')[:100]
+            } for r in search_results[:3]
+        ])
+        # Build enhanced references directly from the top search results (no deduplication)
         enhanced_references = []
-        seen_citations = {}
-        for i, citation in enumerate(citations[:3]):
-            raw_key_terms = search_results[i].get("key_terms", [])
+        for result in search_results[:3]:
+            raw_key_terms = result.get("key_terms", [])
             if isinstance(raw_key_terms, str):
                 key_terms = [k.strip() for k in raw_key_terms.split(",") if k.strip()]
             else:
                 key_terms = raw_key_terms
-            if citation in seen_citations:
-                # Aggregate key terms for duplicate citations
-                seen_citations[citation]["key_terms"].extend([k for k in key_terms if k not in seen_citations[citation]["key_terms"]])
-            else:
-                seen_citations[citation] = {
-                    "relevance_score": search_results[i]["relevance_score"] if i < len(search_results) else 0.8,
-                    "chunk_preview": context_chunks[i][:200] + "..." if len(context_chunks[i]) > 200 else context_chunks[i],
-                    "key_terms": key_terms
-                }
-        for citation, data in seen_citations.items():
             enhanced_references.append(DocumentReference(
-                citation=citation,
-                relevance_score=data["relevance_score"],
-                chunk_preview=data["chunk_preview"],
-                key_terms=data["key_terms"]
+                citation=result["citation"],
+                relevance_score=result["relevance_score"],
+                chunk_preview=result["chunk"][:200] + "..." if len(result["chunk"]) > 200 else result["chunk"],
+                key_terms=key_terms
             ))
         enhanced_references_dicts = [ref.dict() for ref in enhanced_references]
-        print("[API Debug] enhanced_references_dicts:", enhanced_references_dicts)
+        # Debug: Print constructed enhanced_references_dicts
+        print("[DEBUG] enhanced_references_dicts:", enhanced_references_dicts)
 
         # Prepare document_ref for ChatMessage
         try:
@@ -440,13 +436,13 @@ async def evaluate_challenge_answer(
     correct_answer: str,
     question_text: str,
     document_context: str,
-    provider: str = "openai",
-    http_request: Request = None
+    http_request: Request,
+    provider: str = "openai"
 ):
     """Evaluate a user's answer to a challenge question with enhanced feedback and similarity scoring"""
     
     # Extract API keys from headers
-    api_keys = extract_api_keys(http_request) if http_request else {}
+    api_keys = extract_api_keys(http_request)
     
     # Initialize LLM service with API keys
     llm_service = LLMService(api_keys)
@@ -805,12 +801,12 @@ async def get_next_challenge_question(request: ChallengeRequest, http_request: R
 @router.post("/challenge/evaluate-answer", response_model=ChallengeEvaluation)
 async def evaluate_challenge_answer_interactive(
     request: ChallengeEvaluationRequest,
-    http_request: Request = None
+    http_request: Request
 ):
     """Evaluate a user's answer to a challenge question with detailed feedback"""
     
     # Extract API keys from headers
-    api_keys = extract_api_keys(http_request) if http_request else {}
+    api_keys = extract_api_keys(http_request)
     
     # Initialize LLM service with API keys
     llm_service = LLMService(api_keys)

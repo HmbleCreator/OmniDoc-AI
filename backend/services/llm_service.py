@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from enum import Enum
 import json
 import re
+import collections.abc
 
 # Optional imports with graceful fallbacks
 try:
@@ -54,7 +55,8 @@ INSTRUCTIONS:
 2. Provide a clear, concise answer
 3. Include specific document references (e.g., "Page 3, Section 2.1")
 4. Explain your reasoning step-by-step
-5. If the context doesn't contain enough information, say so clearly
+5. If the user requests, provide a layman/simple explanation or analogy in addition to the technical answer
+6. If the context doesn't contain enough information, say so clearly
 
 RESPONSE FORMAT:
 Answer: [Your direct answer here]
@@ -181,7 +183,9 @@ class LLMProvider(str, Enum):
     LOCAL = "local"
 
 class LLMService:
-    def __init__(self, api_keys: Dict[str, str] = None):
+    def __init__(self, api_keys: Optional[Dict[str, str]] = None):
+        if api_keys is None:
+            api_keys = {}
         self.openai_client = None
         self.gemini_model = None
         self.claude_client = None
@@ -190,8 +194,10 @@ class LLMService:
         # Initialize providers with provided API keys
         self._initialize_providers(api_keys)
     
-    def _initialize_providers(self, api_keys: Dict[str, str] = None):
+    def _initialize_providers(self, api_keys: Optional[Dict[str, str]] = None):
         """Initialize LLM providers with API keys from request or environment"""
+        if api_keys is None:
+            api_keys = {}
         # Use provided API keys or fall back to environment variables
         openai_api_key = api_keys.get('openai') if api_keys else os.getenv("OPENAI_API_KEY")
         google_api_key = api_keys.get('gemini') if api_keys else os.getenv("GOOGLE_API_KEY")
@@ -211,9 +217,9 @@ class LLMService:
         # Google Gemini
         if google_api_key and GEMINI_AVAILABLE:
             try:
-                genai.configure(api_key=google_api_key)
+                genai.configure(api_key=google_api_key)  # type: ignore
                 # Use Gemini 1.5 Flash (or change to 'gemini-1.5-flash-lite' if needed)
-                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')  # type: ignore
                 print("✅ Google Gemini initialized")
             except Exception as e:
                 print(f"❌ Google Gemini initialization failed: {e}")
@@ -246,7 +252,7 @@ class LLMService:
             if response_type == "question_answering":
                 return self._parse_qa_response(response_text)
             elif response_type == "challenge_generation":
-                return self._parse_challenge_response(response_text)
+                return {"questions": self._parse_challenge_response(response_text)}
             elif response_type == "answer_evaluation":
                 return self._parse_evaluation_response(response_text)
             elif response_type == "summary_generation":
@@ -357,7 +363,7 @@ class LLMService:
                     max_tokens=max_tokens,
                     temperature=0.7
                 )
-                return response.choices[0].message.content
+                return response.choices[0].message.content or ""
             
             elif provider == LLMProvider.GEMINI and self.gemini_model:
                 import traceback
@@ -388,7 +394,7 @@ class LLMService:
                     max_tokens=max_tokens,
                     messages=[{"role": "user", "content": prompt}]
                 )
-                return response.content[0].text
+                return getattr(response.content[0], "text", "")  # type: ignore
             
             elif provider == LLMProvider.LOCAL and self.local_model:
                 response = self.local_model(
@@ -397,7 +403,12 @@ class LLMService:
                     temperature=0.7,
                     stop=["\n\n", "Human:", "Assistant:"]
                 )
-                return response["choices"][0]["text"]
+                choices = response["choices"]  # type: ignore
+                if isinstance(choices, list):
+                    first_choice = choices[0] if choices else None
+                else:
+                    first_choice = next(iter(choices), None)
+                return first_choice.get("text", "") if isinstance(first_choice, dict) else ""
             
             else:
                 raise ValueError(f"Provider {provider} not available or not initialized")
@@ -431,7 +442,7 @@ class LLMService:
             "raw_response": response_text
         }
 
-    def generate_challenge_questions(self, context: List[str], provider: str = "openai", key_terms: List[str] = None) -> List[Dict[str, str]]:
+    def generate_challenge_questions(self, context: List[str], provider: str = "openai", key_terms: Optional[List[str]] = None) -> List[Dict[str, str]]:
         """Generate challenge questions with structured response"""
         # Prepare context
         context_text = "\n\n".join(context[:10])  # Use more chunks for question generation

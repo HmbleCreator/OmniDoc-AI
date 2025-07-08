@@ -202,7 +202,7 @@ class EnhancedDocumentProcessor:
                 page = doc[page_num]
                 
                 # Extract text blocks with positioning
-                blocks = page.get_text("dict")["blocks"]
+                blocks = page.get_text("dict")["blocks"]  # type: ignore
                 page_content = {
                     "page_number": page_num + 1,
                     "blocks": [],
@@ -312,7 +312,7 @@ class EnhancedDocumentProcessor:
             
             # Calculate semantic density for dynamic chunk sizing
             semantic_density = self._calculate_semantic_density(page_text)
-            readability_score = textstat.flesch_reading_ease(page_text)
+            readability_score = textstat.flesch_reading_ease(page_text)  # type: ignore
             
             # Determine optimal chunk size based on content type
             if semantic_density > 0.8:  # Math-heavy or technical content
@@ -483,8 +483,10 @@ class EnhancedDocumentProcessor:
         else:
             return "paragraph"
 
-    def process_document(self, file_path: str, filename: str, api_keys: Dict[str, str] = None, provider: str = "openai") -> Dict[str, Any]:
+    def process_document(self, file_path: str, filename: str, api_keys: Optional[Dict[str, str]] = None, provider: str = "openai") -> Dict[str, Any]:
         """Process a document with enhanced metadata and semantic analysis"""
+        if api_keys is None:
+            api_keys = {}
         try:
             # Extract structured content with headers
             structured_content = self.extract_text_with_structure(file_path, filename)
@@ -618,8 +620,9 @@ class EnhancedDocumentProcessor:
         """Get reasoning chain for a session"""
         return self.reasoning_chains.get(session_id)
 
-    def generate_summary(self, content: str, max_words: int = 150, api_keys: Dict[str, str] = None, provider: str = "openai") -> str:
-        """Generate enhanced summary using structured prompt template"""
+    def generate_summary(self, content: str, max_words: int = 150, api_keys: Optional[Dict[str, str]] = None, provider: str = "openai") -> str:
+        if api_keys is None:
+            api_keys = {}
         try:
             # Use the LLM service for structured summary generation
             from .llm_service import LLMService
@@ -732,16 +735,17 @@ class EnhancedDocumentProcessor:
 
     def get_document_chunks(self, document_id: str) -> List[Dict[str, Any]]:
         """Get all chunks for a document with enhanced metadata"""
-        results = self.collection.get(where={"document_id": document_id})
+        results = self.collection.get(where={"document_id": document_id})  # type: ignore
         
-        if not results['documents']:
+        if not results['documents'] or results['documents'][0] is None:
             return []
         
         chunks = []
         for i, doc in enumerate(results['documents']):
+            metadata = results['metadatas'][i] if results['metadatas'] is not None else {}
             chunks.append({
                 "text": doc,
-                "metadata": results['metadatas'][i]
+                "metadata": metadata
             })
         
         return chunks
@@ -750,10 +754,10 @@ class EnhancedDocumentProcessor:
         """Delete document and all its chunks"""
         self.collection.delete(where={"document_id": document_id})
 
-    def hybrid_search_with_mmr(self, query: str, document_ids: List[str] = None, 
+    def hybrid_search_with_mmr(self, query: str, document_ids: Optional[List[str]] = None, 
                               top_k: int = 10, diversity_weight: float = 0.3) -> List[Dict[str, Any]]:
-        """Hybrid search combining dense vectors, BM25, and MMR diversification"""
-        
+        if document_ids is None:
+            document_ids = []
         t0 = time.time()
         # Step 1: Dense retrieval
         where_clause = None
@@ -763,10 +767,10 @@ class EnhancedDocumentProcessor:
         dense_results = self.collection.query(
             query_embeddings=self.embedding_model.encode([query]).tolist(),
             n_results=top_k * 2,  # Get more results for MMR
-            where=where_clause
+            where=where_clause if where_clause is not None else None  # type: ignore
         )
         
-        if not dense_results['documents'][0]:
+        if not dense_results['documents'] or dense_results['documents'][0] is None:
             return []
         
         logger.info(f"Dense retrieval took {time.time() - t0:.2f}s")
@@ -777,7 +781,7 @@ class EnhancedDocumentProcessor:
         logger.info(f"BM25 search took {time.time() - t1:.2f}s")
         t2 = time.time()
         # Step 3: Combine and rerank
-        combined_results = self._combine_search_results(dense_results, bm25_results, query)
+        combined_results = self._combine_search_results(dict(dense_results), bm25_results, query)
         
         logger.info(f"Combine and rerank took {time.time() - t2:.2f}s")
         t3 = time.time()
@@ -797,9 +801,16 @@ class EnhancedDocumentProcessor:
         # Step 6: Format results with enhanced metadata
         formatted_results = []
         for result in reranked_results:
-            # Ensure relevance score is properly bounded
-            relevance_score = max(0.0, min(1.0, result["relevance_score"]))
-            
+            # Debug: Print the full result object
+            print("[DEBUG] Formatting result:", result)
+            # Robustly get relevance_score: use result['relevance_score'] if > 0, else calculate from distance
+            raw_score = result.get("relevance_score", None)
+            if raw_score is not None and raw_score > 0:
+                relevance_score = raw_score
+            else:
+                # Fallback: calculate from distance if possible
+                dist = result.get("distance", 1.0)
+                relevance_score = max(0.0, min(1.0, 1 - dist))
             formatted_result = {
                 "chunk": result["chunk"],
                 "metadata": result["metadata"],
@@ -811,10 +822,19 @@ class EnhancedDocumentProcessor:
                 "readability_score": result["metadata"].get("readability_score", 50)
             }
             formatted_results.append(formatted_result)
-        
+        # Debug: Print top 3 formatted_results before returning
+        print("[DEBUG] Top 3 formatted_results returned:", [
+            {
+                'citation': r.get('citation'),
+                'relevance_score': r.get('relevance_score'),
+                'chunk_preview': r.get('chunk', '')[:100]
+            } for r in formatted_results[:3]
+        ])
         return formatted_results
 
-    def _bm25_search(self, query: str, document_ids: List[str] = None, top_k: int = 10) -> List[Dict]:
+    def _bm25_search(self, query: str, document_ids: Optional[List[str]] = None, top_k: int = 10) -> List[Dict]:
+        if document_ids is None:
+            document_ids = []
         """BM25 keyword-based search"""
         bm25_results = []
         
@@ -853,8 +873,16 @@ class EnhancedDocumentProcessor:
             dense_results['metadatas'][0],
             dense_results['distances'][0]
         )):
-            # Ensure relevance score is properly bounded
-            relevance_score = max(0.0, min(1.0, 1 - distance))
+            # Print raw distance for debugging
+            print(f"[DEBUG] Raw dense distance: {distance}")
+            # If distance is in [0, 2] (cosine), normalize to [0, 1]
+            if distance > 1:
+                norm_distance = (distance - 1) / 1  # Map [1,2] to [0,1]
+                relevance_score = max(0.0, min(1.0, 1 - norm_distance))
+                print(f"[DEBUG] Normalized (cosine) distance: {norm_distance}, relevance_score: {relevance_score}")
+            else:
+                relevance_score = max(0.0, min(1.0, 1 - distance))
+                print(f"[DEBUG] Standard distance: {distance}, relevance_score: {relevance_score}")
             combined.append({
                 "chunk": doc,
                 "metadata": metadata,
@@ -870,11 +898,14 @@ class EnhancedDocumentProcessor:
             if existing:
                 # Boost existing result with proper bounds
                 bm25_score = max(0.0, min(1.0, bm25_result["score"]))
+                print(f"[DEBUG] BM25 boost: bm25_score={bm25_score}, before={existing['relevance_score']}")
                 existing["relevance_score"] = max(0.0, min(1.0, (existing["relevance_score"] + bm25_score * 0.3) / 1.3))
+                print(f"[DEBUG] BM25 boost: after={existing['relevance_score']}")
                 existing["search_type"] = "hybrid"
             else:
                 # Add new result with proper bounds
                 bm25_score = max(0.0, min(1.0, bm25_result["score"]))
+                print(f"[DEBUG] BM25 only: bm25_score={bm25_score}")
                 combined.append({
                     "chunk": bm25_result["chunk"],
                     "metadata": {"document_id": bm25_result["document_id"]},
@@ -884,6 +915,9 @@ class EnhancedDocumentProcessor:
                 })
         
         # Sort by relevance score
+        print(f"[DEBUG] Final combined relevance scores: {[r['relevance_score'] for r in combined]}")
+        if all(r['relevance_score'] == 0 for r in combined):
+            print("[DEBUG] All relevance scores are zero! Check distance and BM25 normalization.")
         combined.sort(key=lambda x: x["relevance_score"], reverse=True)
         return combined
 
